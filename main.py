@@ -1,25 +1,11 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-import os
+from config import APP_NAME, VERSION, DESCRIPTION, AUTHOR
 
-app = FastAPI(title="CLG Backend API", version="0.1.0")
-
-# --- CORS setup ---
-origins = [
-    "http://127.0.0.1:3000",  # local frontend (Next.js dev)
-    "http://localhost:3000",
-    "https://aiagentclg.com",  # your live domain
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title=APP_NAME,
+    version=VERSION,
+    description=DESCRIPTION
 )
-# -------------------
 
 @app.get("/")
 def root():
@@ -27,18 +13,53 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {"ok": True, "timestamp": datetime.now()}
+    return {"health": "ok"}
+
+@app.get("/info")
+def app_info():
+    return {
+        "app_name": APP_NAME,
+        "version": VERSION,
+        "author": AUTHOR
+    }
 
 @app.post("/generate_qapi")
 def generate_qapi():
-    os.makedirs("output", exist_ok=True)
-    filename = f"output/QA_PI_Summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    with open(filename, "w") as f:
-        f.write("QA/PI Summary generated successfully.\n")
-        f.write(f"Timestamp: {datetime.now()}\n")
-    return {"message": f"Created {filename}"}
+    # Placeholder for your QAPI logic
+    return {"message": "QAPI generation endpoint is ready"}
 
-@app.on_event("shutdown")
-def shutdown_event():
-    print("🧹 Shutting down CLG backend cleanly.")
+import os
+import json
+
+@app.get("/audit")
+def run_audit():
+    """Scan local compliance data and summarize status."""
+    output_dir = os.path.expanduser("~/Desktop/XM4-LabTwin")
+    summary = {"files_found": [], "report_summary": []}
+
+    try:
+        # Scan XM4 output folder
+        for file in os.listdir(output_dir):
+            if file.endswith(".json") or file.endswith(".csv"):
+                summary["files_found"].append(file)
+
+        # Example logic: look for the latest model report
+        latest_json = sorted(
+            [f for f in summary["files_found"] if f.startswith("XM4_Model_Report")],
+            reverse=True
+        )
+        if latest_json:
+            with open(os.path.join(output_dir, latest_json[0]), "r") as f:
+                data = json.load(f)
+            summary["report_summary"].append({
+                "latest_report": latest_json[0],
+                "keys": list(data.keys())[:5]  # preview
+            })
+        else:
+            summary["report_summary"].append({"message": "No XM4 reports found."})
+
+    except Exception as e:
+        summary["error"] = str(e)
+
+    return summary
 
